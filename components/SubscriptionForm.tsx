@@ -5,6 +5,8 @@ import Card from './common/Card';
 import Input from './common/Input';
 import Select from './common/Select';
 import Button from './common/Button';
+import { GoogleGenAI } from '@google/genai';
+import { SparklesIcon } from './icons/SparklesIcon';
 
 interface SubscriptionFormProps {
   onSubmit: (subscription: Subscription | Omit<Subscription, 'id'>) => void;
@@ -21,6 +23,7 @@ const SubscriptionForm: React.FC<SubscriptionFormProps> = ({ onSubmit, onCancel,
     category: '',
     iconUrl: ''
   });
+  const [isCategorizing, setIsCategorizing] = useState(false);
 
   useEffect(() => {
     if (initialData) {
@@ -38,6 +41,39 @@ const SubscriptionForm: React.FC<SubscriptionFormProps> = ({ onSubmit, onCancel,
   const handleChange = (e: React.ChangeEvent<HTMLInputElement | HTMLSelectElement>) => {
     const { name, value } = e.target;
     setFormData(prev => ({ ...prev, [name]: value }));
+  };
+
+  const handleAiCategorize = async () => {
+    if (!formData.name) {
+      alert('Please enter a service name first.');
+      return;
+    }
+    setIsCategorizing(true);
+    try {
+      const ai = new GoogleGenAI({ apiKey: process.env.API_KEY });
+      const prompt = `Based on the subscription name "${formData.name}", which of the following categories is the most appropriate?
+      Categories: ${CATEGORIES.join(', ')}
+      Please respond with only the single most relevant category name from the list provided.`;
+      
+      const response = await ai.models.generateContent({
+        model: 'gemini-3-flash-preview',
+        contents: prompt,
+      });
+
+      const suggestedCategory = response.text?.trim();
+
+      if (suggestedCategory && CATEGORIES.includes(suggestedCategory)) {
+        setFormData(prev => ({ ...prev, category: suggestedCategory }));
+      } else {
+        alert(`AI suggestion ("${suggestedCategory}") is not a valid category. Please select one manually.`);
+      }
+
+    } catch (error) {
+      console.error("AI categorization failed:", error);
+      alert('AI categorization failed. Please select a category manually.');
+    } finally {
+      setIsCategorizing(false);
+    }
   };
 
   const handleSubmit = (e: React.FormEvent) => {
@@ -113,19 +149,33 @@ const SubscriptionForm: React.FC<SubscriptionFormProps> = ({ onSubmit, onCancel,
               />
             </div>
             <div className="sm:col-span-3">
-              <Select
-                label="Category"
-                id="category"
-                name="category"
-                value={formData.category}
-                onChange={handleChange}
-                required
+              <div className="flex justify-between items-baseline mb-2">
+                  <label htmlFor="category" className="block text-sm font-medium leading-6 text-slate-300">
+                      Category
+                  </label>
+                  <button
+                      type="button"
+                      onClick={handleAiCategorize}
+                      disabled={!formData.name || isCategorizing}
+                      className="flex items-center gap-1.5 rounded-md bg-indigo-500/10 px-2 py-1 text-xs font-semibold text-indigo-400 ring-1 ring-inset ring-indigo-500/20 hover:bg-indigo-500/20 disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
+                      >
+                      <SparklesIcon />
+                      <span>{isCategorizing ? 'Working...' : 'AI Suggest'}</span>
+                  </button>
+              </div>
+              <select
+                  id="category"
+                  name="category"
+                  value={formData.category}
+                  onChange={handleChange}
+                  required
+                  className="block w-full rounded-md border-0 bg-white/5 py-1.5 text-slate-100 shadow-sm ring-1 ring-inset ring-slate-600 focus:ring-2 focus:ring-inset focus:ring-indigo-500 sm:text-sm sm:leading-6 [&_*]:bg-slate-800"
               >
-                <option value="" disabled>Select a category</option>
-                {CATEGORIES.map(cat => (
+                  <option value="" disabled>Select a category</option>
+                  {CATEGORIES.map(cat => (
                   <option key={cat} value={cat}>{cat}</option>
-                ))}
-              </Select>
+                  ))}
+              </select>
             </div>
             <div className="sm:col-span-3">
               <Input
