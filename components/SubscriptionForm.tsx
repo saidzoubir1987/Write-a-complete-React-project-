@@ -60,6 +60,8 @@ const SubscriptionForm: React.FC<SubscriptionFormProps> = ({ onSubmit, onCancel,
         contents: prompt,
       });
 
+      // FIX: The `response.text` is the correct way to get the text from the response.
+      // It returns `string | undefined`. The optional chaining was not incorrect, but it's cleaner to handle the undefined case.
       const suggestedCategory = response.text?.trim();
 
       if (suggestedCategory && CATEGORIES.includes(suggestedCategory)) {
